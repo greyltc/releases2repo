@@ -3,7 +3,6 @@ import sys
 import tarfile
 from os import listdir
 import subprocess
-from compression import zstd
 from pathlib import Path
 from urllib import request
 from tempfile import TemporaryDirectory
@@ -17,10 +16,10 @@ import releases2repo
 
 from releases2repo import Releases2Repo
 
-def run(user:str="greyltc", repo:str="arch-packages"):
-    r = Releases2Repo()
+def run(hub:str="github", owner:str="greyltc", repo:str="arch-packages"):
+    r = Releases2Repo(hub=hub, owner=owner, repo=repo)
 
-    releases = r.get_all_releases(user, repo)
+    releases = r.get_all_releases()
     print(f"Total releases found: {len(releases)}")
     package_urls = {}
     memfiles = {}
@@ -73,10 +72,11 @@ def run(user:str="greyltc", repo:str="arch-packages"):
                             other_ver = pkgs[this["NAME"]]["VERSION"]
                             this_ver = this["VERSION"]
                             com_rslt = subprocess.run(['vercmp', other_ver, this_ver], text=True, capture_output=True)
-                            code = int(com_rslt.stdout.strip())
-                            if code < 0:
+                            version_compare_code = int(com_rslt.stdout.strip())
+                            if version_compare_code <= 0:
                                 keep_it = True
                                 # evict the out of date version
+                                del package_urls[pkgs[this["NAME"]]["FILENAME"]]
                                 to_unlink = tdb / f'{this["NAME"]}-{pkgs[this["NAME"]]["VERSION"]}' / "desc"
                                 to_unlink.unlink()
                                 to_unlink = tfiles / f'{this["NAME"]}-{pkgs[this["NAME"]]["VERSION"]}' / "desc"
@@ -95,7 +95,6 @@ def run(user:str="greyltc", repo:str="arch-packages"):
                             pkgs[this["NAME"]] = {}
                             pkgs[this["NAME"]]["VERSION"] = this["VERSION"]
                             pkgs[this["NAME"]]["FILENAME"] = this["FILENAME"]
-                            #versions[this["NAME"]] = this["VERSION"]
                             package_urls[this["FILENAME"]] = release_package_urls[this["FILENAME"]]
                             pnamedb = tdb / pname.name
                             pnamedb.mkdir(exist_ok=True)
@@ -127,7 +126,6 @@ def run(user:str="greyltc", repo:str="arch-packages"):
 
     class RedirectHandler(http.server.SimpleHTTPRequestHandler):
         def do_GET(self):
-            # Example: Redirect a specific path
             rpath = self.path.lstrip("/")
             if rpath in package_urls:
                 self.send_response(301)
@@ -151,16 +149,23 @@ def run(user:str="greyltc", repo:str="arch-packages"):
 
 def main_parser() -> argparse.ArgumentParser:
     description = releases2repo.__doc__
-    parser = argparse.ArgumentParser(description=description)
+    parser = argparse.ArgumentParser(description=description, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument(
         "--version",
         "-V",
         action="version",
-        version=f'r3pcomms {releases2repo.__version__} ({",".join(releases2repo.__path__)})',
+        version=f'releases2repo {releases2repo.__version__} ({",".join(releases2repo.__path__)})',
     )
     parser.add_argument(
-        "--user",
-        "-u",
+        "--type",
+        "-t",
+        default="github",
+        choices=['github', 'gitlab'],
+        help="type of hub to fetch from"
+    )
+    parser.add_argument(
+        "--owner",
+        "-o",
         default="greyltc",
         help="owner of vcs repo"
     )
@@ -178,9 +183,9 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
         parser.prog = prog
     args = parser.parse_args(cli_args)
 
-
     run_args = {
-        "user": args.user,
+        "hub": args.hub,
+        "owner": args.owner,
         "repo": args.repo,
     }
     run(**run_args)
@@ -190,7 +195,7 @@ def entrypoint() -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:], "python -m r3pcomms")
+    main(sys.argv[1:], "python -m releases2repo")
 
 
 __all__ = [

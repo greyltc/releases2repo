@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: MIT
 
 """
-take package files from github releases and turn them into a repo that pacman can use 
+take package files from vcs releases and turn them into a repo that pacman can use
 """
 
-from ._libreleases2repo import Releases2Repo
+from .libreleases2repo import Releases2Repo
 from .__about__ import __version__
 
 __all__ = [
