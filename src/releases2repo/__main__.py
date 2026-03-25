@@ -16,7 +16,8 @@ import releases2repo
 
 from releases2repo import Releases2Repo
 
-def run(hub:str="github", owner:str="greyltc", repo:str="arch-packages"):
+
+def run(hub: str = "github", owner: str = "greyltc", repo: str = "arch-packages"):
     r = Releases2Repo(hub=hub, owner=owner, repo=repo)
 
     releases = r.get_all_releases()
@@ -38,21 +39,34 @@ def run(hub:str="github", owner:str="greyltc", repo:str="arch-packages"):
                 got_files = False
                 assets = release["assets"]
                 for asset in assets:
-                    if asset["name"].endswith(".pkg.tar.zst") and asset["content_type"] == "application/zstd":
-                        release_package_urls[asset["name"]] = asset["browser_download_url"]
-                    if asset["name"] == "repo.db" and asset["content_type"] == "application/zstd":
+                    if (
+                        asset["name"].endswith(".pkg.tar.zst")
+                        and asset["content_type"] == "application/zstd"
+                    ):
+                        release_package_urls[asset["name"]] = asset[
+                            "browser_download_url"
+                        ]
+                    if (
+                        asset["name"] == "repo.db"
+                        and asset["content_type"] == "application/zstd"
+                    ):
                         has_repo = True
-                    if asset["name"] == "repo.files" and asset["content_type"] == "application/zstd":
+                    if (
+                        asset["name"] == "repo.files"
+                        and asset["content_type"] == "application/zstd"
+                    ):
                         fpath = tpathb / asset["name"]
-                        dlrslt = request.urlretrieve(asset["browser_download_url"], fpath)
-                        with tarfile.open(fpath, mode='r:zst') as tar_file:
+                        dlrslt = request.urlretrieve(
+                            asset["browser_download_url"], fpath
+                        )
+                        with tarfile.open(fpath, mode="r:zst") as tar_file:
                             tar_file.extractall(tpathb)
                             got_files = True
                         fpath.unlink()
                 if has_repo and got_files:
-                    for pname in tpathb.glob('*'):
+                    for pname in tpathb.glob("*"):
                         descfile = pname / "desc"
-                        with open(descfile, 'r') as file:
+                        with open(descfile, "r") as file:
                             interesting_vars = ("%NAME%", "%VERSION%", "%FILENAME%")
                             nextline = ""
                             this = {}
@@ -63,29 +77,51 @@ def run(hub:str="github", owner:str="greyltc", repo:str="arch-packages"):
                                     if nextline == "VERSION":
                                         # we don't need to read past "%VERSION%" for now
                                         this[nextline] = sline
-                                        break  
+                                        break
                                     nextline = ""
                                 else:
                                     if sline in interesting_vars:
-                                        nextline = sline.strip('%')
+                                        nextline = sline.strip("%")
                         if this["NAME"] in pkgs:
                             other_ver = pkgs[this["NAME"]]["VERSION"]
                             this_ver = this["VERSION"]
-                            com_rslt = subprocess.run(['vercmp', other_ver, this_ver], text=True, capture_output=True)
+                            com_rslt = subprocess.run(
+                                ["vercmp", other_ver, this_ver],
+                                text=True,
+                                capture_output=True,
+                            )
                             version_compare_code = int(com_rslt.stdout.strip())
                             if version_compare_code <= 0:
                                 keep_it = True
                                 # evict the out of date version
                                 del package_urls[pkgs[this["NAME"]]["FILENAME"]]
-                                to_unlink = tdb / f'{this["NAME"]}-{pkgs[this["NAME"]]["VERSION"]}' / "desc"
+                                to_unlink = (
+                                    tdb
+                                    / f'{this["NAME"]}-{pkgs[this["NAME"]]["VERSION"]}'
+                                    / "desc"
+                                )
                                 to_unlink.unlink()
-                                to_unlink = tfiles / f'{this["NAME"]}-{pkgs[this["NAME"]]["VERSION"]}' / "desc"
+                                to_unlink = (
+                                    tfiles
+                                    / f'{this["NAME"]}-{pkgs[this["NAME"]]["VERSION"]}'
+                                    / "desc"
+                                )
                                 to_unlink.unlink()
-                                to_unlink = tfiles / f'{this["NAME"]}-{pkgs[this["NAME"]]["VERSION"]}' / "files"
+                                to_unlink = (
+                                    tfiles
+                                    / f'{this["NAME"]}-{pkgs[this["NAME"]]["VERSION"]}'
+                                    / "files"
+                                )
                                 to_unlink.unlink()
-                                to_rm = tfiles / f'{this["NAME"]}-{pkgs[this["NAME"]]["VERSION"]}'
+                                to_rm = (
+                                    tfiles
+                                    / f'{this["NAME"]}-{pkgs[this["NAME"]]["VERSION"]}'
+                                )
                                 to_rm.rmdir()
-                                to_rm = tdb / f'{this["NAME"]}-{pkgs[this["NAME"]]["VERSION"]}'
+                                to_rm = (
+                                    tdb
+                                    / f'{this["NAME"]}-{pkgs[this["NAME"]]["VERSION"]}'
+                                )
                                 to_rm.rmdir()
                             else:
                                 keep_it = False
@@ -95,32 +131,34 @@ def run(hub:str="github", owner:str="greyltc", repo:str="arch-packages"):
                             pkgs[this["NAME"]] = {}
                             pkgs[this["NAME"]]["VERSION"] = this["VERSION"]
                             pkgs[this["NAME"]]["FILENAME"] = this["FILENAME"]
-                            package_urls[this["FILENAME"]] = release_package_urls[this["FILENAME"]]
+                            package_urls[this["FILENAME"]] = release_package_urls[
+                                this["FILENAME"]
+                            ]
                             pnamedb = tdb / pname.name
                             pnamedb.mkdir(exist_ok=True)
                             descfile.copy_into(pnamedb)
                             pname.move_into(tfiles)
         if listdir(tdb):
-            #repo_path = Path("repo.db.tar.zst")
+            # repo_path = Path("repo.db.tar.zst")
             repo_path = tpatht / "repo.db.tar.zst"
-            with tarfile.open(repo_path, mode='w:zst') as tf:
-                for package in tdb.glob('*'):
+            with tarfile.open(repo_path, mode="w:zst") as tf:
+                for package in tdb.glob("*"):
                     tf.add(str(package), arcname=package.name)
             with open(repo_path, "rb") as fh:
                 memfiles["repo.db"] = io.BytesIO(fh.read())
-            #Path("repo.db").symlink_to(repo_path)
+            # Path("repo.db").symlink_to(repo_path)
 
         if listdir(tfiles):
-            #files_path = Path("repo.files.tar.zst")
+            # files_path = Path("repo.files.tar.zst")
             files_path = tpatht / "repo.files.tar.zst"
-            with tarfile.open(files_path, mode='w:zst') as tf:
-                for package in tfiles.glob('*'):
+            with tarfile.open(files_path, mode="w:zst") as tf:
+                for package in tfiles.glob("*"):
                     tf.add(str(package), arcname=package.name)
             with open(files_path, "rb") as fh:
                 memfiles["repo.files"] = io.BytesIO(fh.read())
-            #Path("repo.files").symlink_to(files_path)
+            # Path("repo.files").symlink_to(files_path)
 
-    #if package_urls:
+    # if package_urls:
     #    print("Packages found:")
     #    print(str(dict(reversed(list(package_urls.items())))))
 
@@ -129,7 +167,7 @@ def run(hub:str="github", owner:str="greyltc", repo:str="arch-packages"):
             rpath = self.path.lstrip("/")
             if rpath in package_urls:
                 self.send_response(301)
-                self.send_header('Location', package_urls[rpath])
+                self.send_header("Location", package_urls[rpath])
                 self.end_headers()
             elif rpath in memfiles:
                 self.send_response(200)
@@ -147,9 +185,12 @@ def run(hub:str="github", owner:str="greyltc", repo:str="arch-packages"):
         print(f"Serving with redirects at http://localhost:{PORT}")
         httpd.serve_forever()
 
+
 def main_parser() -> argparse.ArgumentParser:
     description = releases2repo.__doc__
-    parser = argparse.ArgumentParser(description=description, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=description, formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
     parser.add_argument(
         "--version",
         "-V",
@@ -160,22 +201,23 @@ def main_parser() -> argparse.ArgumentParser:
         "--type",
         "-t",
         default="github",
-        choices=['github', 'gitlab'],
-        help="type of hub to fetch from"
+        choices=["github", "gitlab"],
+        help="type of hub to fetch from",
     )
     parser.add_argument(
         "--owner",
         "-o",
         default="greyltc",
-        help="owner of vcs repo"
+        help="owner of vcs repo",
     )
     parser.add_argument(
         "--repo",
         "-r",
         default="arch-packages",
-        help="vcs repo name"
+        help="vcs repo name",
     )
     return parser
+
 
 def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     parser = main_parser()
@@ -189,6 +231,7 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
         "repo": args.repo,
     }
     run(**run_args)
+
 
 def entrypoint() -> None:
     main(sys.argv[1:])
