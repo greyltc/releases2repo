@@ -141,24 +141,24 @@ def run(hub: str = "github", owner: str = "greyltc", repo: str = "arch-packages"
                             descfile.copy_into(pnamedb)
                             pname.move_into(tfiles)
         if listdir(tdb):
-            # repo_path = Path("repo.db.tar.zst")
-            repo_path = tpatht / "repo.db.tar.zst"
+            # repo_path = Path(f"{r.repo_name}.db.tar.zst")
+            repo_path = tpatht / f"{r.repo_name}.db.tar.zst"
             with tarfile.open(repo_path, mode="w:zst") as tf:
                 for package in tdb.glob("*"):
                     tf.add(str(package), arcname=package.name)
             with open(repo_path, "rb") as fh:
-                memfiles["repo.db"] = io.BytesIO(fh.read())
-            # Path("repo.db").symlink_to(repo_path)
+                memfiles[f"{r.repo_name}.db"] = io.BytesIO(fh.read())
+            # Path(f"{r.repo_name}.db").symlink_to(repo_path)
 
         if listdir(tfiles):
-            # files_path = Path("repo.files.tar.zst")
-            files_path = tpatht / "repo.files.tar.zst"
+            # files_path = Path(f"{r.repo_name}.files.tar.zst")
+            files_path = tpatht / f"{r.repo_name}.files.tar.zst"
             with tarfile.open(files_path, mode="w:zst") as tf:
                 for package in tfiles.glob("*"):
                     tf.add(str(package), arcname=package.name)
             with open(files_path, "rb") as fh:
-                memfiles["repo.files"] = io.BytesIO(fh.read())
-            # Path("repo.files").symlink_to(files_path)
+                memfiles[f"{r.repo_name}.files"] = io.BytesIO(fh.read())
+            # Path(f"{r.repo_name}.files").symlink_to(files_path)
 
     # if package_urls:
     #    print("Packages found:")
@@ -184,10 +184,19 @@ def run(hub: str = "github", owner: str = "greyltc", repo: str = "arch-packages"
             else:
                 self.send_error(404, "nah")
 
-    PORT = 8000
     socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("", PORT), RedirectHandler) as httpd:
-        print(f"Repo server running at http://localhost:{PORT}")
+    with socketserver.TCPServer(
+        (r.webserver_host, r.webserver_port), RedirectHandler
+    ) as httpd:
+        print(f"Repo server running at http://{r.webserver_host}:{r.webserver_port}")
+        print("")
+        print("Add the following three lines to your pacman.conf:")
+        print(f"[{r.repo_name}]")
+        print("SigLevel = Optional TrustAll")
+        print(f"Server = http://{r.webserver_host}:{r.webserver_port}/")
+        print("")
+        print("Serving...(press Ctrl+c to stop)...")
+
         httpd.serve_forever()
 
 
@@ -205,21 +214,33 @@ def main_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--type",
         "-t",
-        default="github",
+        default=Releases2Repo.hub,
         choices=["github", "gitlab"],
         help="type of hub to fetch from",
     )
     parser.add_argument(
         "--owner",
         "-o",
-        default="greyltc",
+        default=Releases2Repo.owner,
         help="owner of vcs repo",
     )
     parser.add_argument(
         "--repo",
         "-r",
-        default="arch-packages",
+        default=Releases2Repo.repo,
         help="vcs repo name",
+    )
+    parser.add_argument(
+        "--port",
+        "-p",
+        default=Releases2Repo.webserver_port,
+        help="Local webserver port to listen on",
+    )
+    parser.add_argument(
+        "--bind",
+        "-b",
+        default=Releases2Repo.webserver_host,
+        help="Local webserver hostname/ip to listen on",
     )
     return parser
 

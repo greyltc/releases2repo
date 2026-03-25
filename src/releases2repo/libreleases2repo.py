@@ -7,11 +7,19 @@ class Releases2Repo:
     hub = "github"
     owner = "greyltc"
     repo = "arch-packages"
+    webserver_port = 59523
+    webserver_host = "127.0.0.1"
+    repo_name = f"{hub}_{owner}_{repo}"
 
-    def __init__(self, hub="github", owner="greyltc", repo="arch-packages"):
+    def __init__(
+        self, hub=hub, owner=owner, repo=repo, port=webserver_port, host=webserver_host
+    ):
         self.hub = hub
         self.owner = owner
         self.repo = repo
+        self.webserver_port = port
+        self.webserver_host = host
+        self.repo_name = f"{hub}_{owner}_{repo}"
 
     def get_all_releases(self):
         all_releases = []
