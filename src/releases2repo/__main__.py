@@ -22,6 +22,7 @@ def run(hub: str = "github", owner: str = "greyltc", repo: str = "arch-packages"
 
     releases = r.get_all_releases()
     print(f"Total releases found: {len(releases)}")
+    usable_releases = 0
     package_urls = {}
     memfiles = {}
     pkgs = {}
@@ -64,6 +65,7 @@ def run(hub: str = "github", owner: str = "greyltc", repo: str = "arch-packages"
                             got_files = True
                         fpath.unlink()
                 if has_repo and got_files:
+                    usable_releases += 1
                     for pname in tpathb.glob("*"):
                         descfile = pname / "desc"
                         with open(descfile, "r") as file:
@@ -161,14 +163,17 @@ def run(hub: str = "github", owner: str = "greyltc", repo: str = "arch-packages"
     # if package_urls:
     #    print("Packages found:")
     #    print(str(dict(reversed(list(package_urls.items())))))
+    print(f"Usable releases found: {usable_releases}")
 
     class RedirectHandler(http.server.SimpleHTTPRequestHandler):
         def do_GET(self):
             rpath = self.path.lstrip("/")
+            # redirect for package files served by hub
             if rpath in package_urls:
                 self.send_response(301)
                 self.send_header("Location", package_urls[rpath])
                 self.end_headers()
+            # serve pacman metadata files from memory
             elif rpath in memfiles:
                 self.send_response(200)
                 self.send_header("Content-type", "application/zstd")
@@ -182,7 +187,7 @@ def run(hub: str = "github", owner: str = "greyltc", repo: str = "arch-packages"
     PORT = 8000
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("", PORT), RedirectHandler) as httpd:
-        print(f"Serving with redirects at http://localhost:{PORT}")
+        print(f"Repo server running at http://localhost:{PORT}")
         httpd.serve_forever()
 
 
@@ -226,7 +231,7 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     args = parser.parse_args(cli_args)
 
     run_args = {
-        "hub": args.hub,
+        "hub": args.type,
         "owner": args.owner,
         "repo": args.repo,
     }
