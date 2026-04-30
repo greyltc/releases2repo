@@ -1,203 +1,53 @@
 import sys
 
-import tarfile
-from os import listdir
-import subprocess
+
 from pathlib import Path
-from urllib import request
-from tempfile import TemporaryDirectory
+
 from collections.abc import Sequence
 import argparse
-import io
-import http.server
-import socketserver
 
 import releases2repo
 
 from releases2repo import Releases2Repo
 
 
-def run(hub: str = "github", owner: str = "greyltc", repo: str = "arch-packages"):
-    r = Releases2Repo(hub=hub, owner=owner, repo=repo)
+def run(
+    hub: str = Releases2Repo.hub,
+    owner: str = Releases2Repo.owner,
+    repo: str = Releases2Repo.repo,
+    port: int = Releases2Repo.webserver_port,
+    host: str = Releases2Repo.webserver_host,
+    from_cache: bool = False,
+    caddy_api_port: int = Releases2Repo.caddy_api_port,
+    caddy_api_host: str = Releases2Repo.caddy_api_host,
+    storage: Path = Releases2Repo.local_storage_path,
+    sync: bool = False,
+    serve: bool = False,
+    caddy: bool = False,
+) -> None:
+    r = Releases2Repo(
+        hub=hub,
+        owner=owner,
+        repo=repo,
+        port=port,
+        host=host,
+        storage=storage,
+    )
 
-    releases = r.get_all_releases()
-    print(f"Total releases found: {len(releases)}")
-    usable_releases = 0
-    package_urls = {}
-    memfiles = {}
-    pkgs = {}
-    with TemporaryDirectory() as tdirt:
-        tpatht = Path(tdirt)
-        tfiles = tpatht / "files" / "repo"
-        tdb = tpatht / "db" / "repo"
-        tfiles.mkdir(parents=True, exist_ok=True)
-        tdb.mkdir(parents=True, exist_ok=True)
-        for release in reversed(releases):
-            release_package_urls = {}
-            with TemporaryDirectory() as tdirb:
-                tpathb = Path(tdirb)
-                has_repo = False
-                got_files = False
-                assets = release["assets"]
-                for asset in assets:
-                    if (
-                        asset["name"].endswith(".pkg.tar.zst")
-                        and asset["content_type"] == "application/zstd"
-                    ):
-                        release_package_urls[asset["name"]] = asset[
-                            "browser_download_url"
-                        ]
-                    if (
-                        asset["name"] == "repo.db"
-                        and asset["content_type"] == "application/zstd"
-                    ):
-                        has_repo = True
-                    if (
-                        asset["name"] == "repo.files"
-                        and asset["content_type"] == "application/zstd"
-                    ):
-                        fpath = tpathb / asset["name"]
-                        dlrslt = request.urlretrieve(
-                            asset["browser_download_url"], fpath
-                        )
-                        with tarfile.open(fpath, mode="r:zst") as tar_file:
-                            tar_file.extractall(tpathb)
-                            got_files = True
-                        fpath.unlink()
-                if has_repo and got_files:
-                    usable_releases += 1
-                    for pname in tpathb.glob("*"):
-                        descfile = pname / "desc"
-                        with open(descfile, "r") as file:
-                            interesting_vars = ("%NAME%", "%VERSION%", "%FILENAME%")
-                            nextline = ""
-                            this = {}
-                            for line in file:
-                                sline = line.strip()
-                                if nextline:
-                                    this[nextline] = sline
-                                    if nextline == "VERSION":
-                                        # we don't need to read past "%VERSION%" for now
-                                        this[nextline] = sline
-                                        break
-                                    nextline = ""
-                                else:
-                                    if sline in interesting_vars:
-                                        nextline = sline.strip("%")
-                        if this["NAME"] in pkgs:
-                            other_ver = pkgs[this["NAME"]]["VERSION"]
-                            this_ver = this["VERSION"]
-                            com_rslt = subprocess.run(
-                                ["vercmp", other_ver, this_ver],
-                                text=True,
-                                capture_output=True,
-                            )
-                            version_compare_code = int(com_rslt.stdout.strip())
-                            if version_compare_code <= 0:
-                                keep_it = True
-                                # evict the out of date version
-                                del package_urls[pkgs[this["NAME"]]["FILENAME"]]
-                                to_unlink = (
-                                    tdb
-                                    / f'{this["NAME"]}-{pkgs[this["NAME"]]["VERSION"]}'
-                                    / "desc"
-                                )
-                                to_unlink.unlink()
-                                to_unlink = (
-                                    tfiles
-                                    / f'{this["NAME"]}-{pkgs[this["NAME"]]["VERSION"]}'
-                                    / "desc"
-                                )
-                                to_unlink.unlink()
-                                to_unlink = (
-                                    tfiles
-                                    / f'{this["NAME"]}-{pkgs[this["NAME"]]["VERSION"]}'
-                                    / "files"
-                                )
-                                to_unlink.unlink()
-                                to_rm = (
-                                    tfiles
-                                    / f'{this["NAME"]}-{pkgs[this["NAME"]]["VERSION"]}'
-                                )
-                                to_rm.rmdir()
-                                to_rm = (
-                                    tdb
-                                    / f'{this["NAME"]}-{pkgs[this["NAME"]]["VERSION"]}'
-                                )
-                                to_rm.rmdir()
-                            else:
-                                keep_it = False
-                        else:
-                            keep_it = True
-                        if keep_it:
-                            pkgs[this["NAME"]] = {}
-                            pkgs[this["NAME"]]["VERSION"] = this["VERSION"]
-                            pkgs[this["NAME"]]["FILENAME"] = this["FILENAME"]
-                            package_urls[this["FILENAME"]] = release_package_urls[
-                                this["FILENAME"]
-                            ]
-                            pnamedb = tdb / pname.name
-                            pnamedb.mkdir(exist_ok=True)
-                            descfile.copy_into(pnamedb)
-                            pname.move_into(tfiles)
-        if listdir(tdb):
-            # repo_path = Path(f"{r.repo_name}.db.tar.zst")
-            repo_path = tpatht / f"{r.repo_name}.db.tar.zst"
-            with tarfile.open(repo_path, mode="w:zst") as tf:
-                for package in tdb.glob("*"):
-                    tf.add(str(package), arcname=package.name)
-            with open(repo_path, "rb") as fh:
-                memfiles[f"{r.repo_name}.db"] = io.BytesIO(fh.read())
-            # Path(f"{r.repo_name}.db").symlink_to(repo_path)
+    if sync or serve or from_cache:
+        col = r.collect_repos(to_local=sync, to_memory=serve, from_cache=from_cache)
 
-        if listdir(tfiles):
-            # files_path = Path(f"{r.repo_name}.files.tar.zst")
-            files_path = tpatht / f"{r.repo_name}.files.tar.zst"
-            with tarfile.open(files_path, mode="w:zst") as tf:
-                for package in tfiles.glob("*"):
-                    tf.add(str(package), arcname=package.name)
-            with open(files_path, "rb") as fh:
-                memfiles[f"{r.repo_name}.files"] = io.BytesIO(fh.read())
-            # Path(f"{r.repo_name}.files").symlink_to(files_path)
-
-    # if package_urls:
-    #    print("Packages found:")
-    #    print(str(dict(reversed(list(package_urls.items())))))
-    print(f"Usable releases found: {usable_releases}")
-
-    class RedirectHandler(http.server.SimpleHTTPRequestHandler):
-        def do_GET(self):
-            rpath = self.path.lstrip("/")
-            # redirect for package files served by hub
-            if rpath in package_urls:
-                self.send_response(301)
-                self.send_header("Location", package_urls[rpath])
-                self.end_headers()
-            # serve pacman metadata files from memory
-            elif rpath in memfiles:
-                self.send_response(200)
-                self.send_header("Content-type", "application/zstd")
-                self.send_header("Content-length", memfiles[rpath].getbuffer().nbytes)
-                self.end_headers()
-                memfiles[rpath].seek(0)
-                self.copyfile(memfiles[rpath], self.wfile)
+        if caddy:
+            if not from_cache:
+                print(
+                    "Error: --caddy requires --from-cache to be set, so that the repo data is available in the local cache for caddy to serve",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
             else:
-                self.send_error(404, "nah")
-
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(
-        (r.webserver_host, r.webserver_port), RedirectHandler
-    ) as httpd:
-        print(f"Repo server running at http://{r.webserver_host}:{r.webserver_port}")
-        print("")
-        print("Add the following three lines to your pacman.conf:")
-        print(f"[{r.repo_name}]")
-        print("SigLevel = Optional TrustAll")
-        print(f"Server = http://{r.webserver_host}:{r.webserver_port}/")
-        print("")
-        print("Serving...(press Ctrl+c to stop)...")
-
-        httpd.serve_forever()
+                r.configure_caddy(col["package_urls"], caddy_api_host, caddy_api_port)
+        elif serve:
+            r.run_webserver(col["package_urls"], col["memfiles"])
 
 
 def main_parser() -> argparse.ArgumentParser:
@@ -242,6 +92,45 @@ def main_parser() -> argparse.ArgumentParser:
         default=Releases2Repo.webserver_host,
         help="Local webserver hostname/ip to listen on",
     )
+    parser.add_argument(
+        "--from-cache",
+        action="store_true",
+        help="Use cached data instead of fetching from the hub, requires --sync to have been run at least once before to populate the cache",
+    )
+    parser.add_argument(
+        "--caddy-api-port",
+        "-c",
+        default=Releases2Repo.caddy_api_port,
+        help="Access caddy's api via this port",
+    )
+    parser.add_argument(
+        "--caddy-api-host",
+        "-H",
+        default=Releases2Repo.caddy_api_host,
+        help="Access caddy's api via this hostname/ip",
+    )
+    parser.add_argument(
+        "--local",
+        "-l",
+        default=Releases2Repo.local_storage_path,
+        help="Local place to store pacman database files",
+    )
+    parser.add_argument(
+        "--sync",
+        "-s",
+        action="store_true",
+        help="Update the local storage cache with the latest release data from the hub",
+    )
+    parser.add_argument(
+        "--serve",
+        action="store_true",
+        help="Run a webserver to serve the repo",
+    )
+    parser.add_argument(
+        "--caddy",
+        action="store_true",
+        help="Configure a caddy webserver (via its API) to serve the repo, requires --from-cache",
+    )
     return parser
 
 
@@ -255,6 +144,15 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
         "hub": args.type,
         "owner": args.owner,
         "repo": args.repo,
+        "port": args.port,
+        "host": args.bind,
+        "from_cache": args.from_cache,
+        "caddy_api_port": args.caddy_api_port,
+        "caddy_api_host": args.caddy_api_host,
+        "storage": Path(args.local),
+        "sync": args.sync,
+        "serve": args.serve,
+        "caddy": args.caddy,
     }
     run(**run_args)
 
@@ -264,7 +162,7 @@ def entrypoint() -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:], "python -m releases2repo")
+    main(sys.argv[1:] + ["--serve"], "python -m releases2repo")
 
 
 __all__ = [
