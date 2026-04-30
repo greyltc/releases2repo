@@ -25,7 +25,7 @@ class Releases2Repo:
     caddy_api_port = 2019
     caddy_api_host = "127.0.0.1"
     repo_name = f"{hub}_{owner}_{repo}"
-    local_storage_path = Path("/var/lib/releases2repo/")
+    local_storage_path = Path("/var/lib/r2repo/")
     reverse_proxy = True  # if True, package files will be proxied through the webserver. if False, package urls will be redirected to the hub.
     extra_headers = {}  # extra headers to add to requests
 
