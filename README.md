@@ -35,6 +35,7 @@ $ run0 pacman -Syu
  core is up to date
  extra is up to date
 :: Starting full system upgrade...
+ there is nothing to do
 ```
 
 ## Hacking
