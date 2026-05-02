@@ -359,11 +359,14 @@ class Releases2Repo:
                 print(
                     f"Failed to query Caddy root config: {e.code} {e.reason}: {err_body}"
                 )
-                if e.code == 111:
+                return False
+            except urllib.error.URLError as e:
+                eargs = e.args[0]
+                if eargs.errno == 111:
+                    print(f"ERROR: {eargs.strerror}", sys.stderr)
                     print(f"Is caddy's api server running on {base.rstrip('/config')}? Hint:")
                     print("systemctl start caddy-api")
                     sys.exit(1)
-                return False
             except json.JSONDecodeError:
                 pass
 
