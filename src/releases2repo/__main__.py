@@ -129,7 +129,7 @@ def main_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--caddy",
         action="store_true",
-        help="Configure a caddy webserver (via its API) to serve the repo, requires --from-cache",
+        help="Configure a caddy webserver (via its API) to serve the repo, requires --sync previously",
     )
     return parser
 
@@ -139,6 +139,9 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
     if prog:
         parser.prog = prog
     args = parser.parse_args(cli_args)
+
+    if args.caddy:
+        args.from_cache = True
 
     run_args = {
         "hub": args.type,
