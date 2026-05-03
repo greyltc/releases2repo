@@ -62,10 +62,12 @@ options:
 ```console
 $ systemctl start caddy-api
 $ run0 r2repo --sync  # indexes the release artifacts and creates/updates a local cache
+Using: github/greyltc/arch-packages
 Total releases found: 28
 Usable releases found: 2
 $ r2repo --caddy  # configures/starts/updates a caddy webserver for pacman from the local cache
-$ r2rep --gen-pacman-config | run0 tee -a /etc/pacman.conf
+Using: github/greyltc/arch-packages
+$ r2repo --gen-pacman-config | run0 tee -a /etc/pacman.conf
 [github_greyltc_arch-packages]
 SigLevel = Optional TrustAll
 Server = http://127.0.0.1:59523/github_greyltc_arch-packages
