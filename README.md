@@ -20,8 +20,8 @@ $ makepkg -Cfis
 ```console
 $ r2repo --help
 usage: r2repo [-h] [--version] [--type {github,gitlab}] [--owner OWNER]
-              [--repo REPO] [--port PORT] [--bind BIND] [--from-cache]
-              [--caddy-api-port CADDY_API_PORT]
+              [--repo REPO] [--port PORT] [--bind BIND] [--gen-pacman-config]
+              [--from-cache] [--caddy-api-port CADDY_API_PORT]
               [--caddy-api-host CADDY_API_HOST] [--local LOCAL] [--sync]
               [--serve] [--caddy]
 
@@ -38,6 +38,8 @@ options:
   --port, -p PORT       Local webserver port to listen on (default: 59523)
   --bind, -b BIND       Local webserver hostname/ip to listen on (default:
                         127.0.0.1)
+  --gen-pacman-config, -g
+                        Generate a pacman configuration stub (default: False)
   --from-cache          Use cached data instead of fetching from the hub,
                         requires --sync to have been run at least once before
                         to populate the cache (default: False)
