@@ -24,6 +24,7 @@ def run(
     sync: bool = False,
     serve: bool = False,
     caddy: bool = False,
+    gen_pacman_config: bool = False,
 ) -> None:
     r = Releases2Repo(
         hub=hub,
@@ -33,19 +34,15 @@ def run(
         host=host,
         storage=storage,
     )
+    if gen_pacman_config:
+        r.print_pacman_config()
+        sys.exit(0)
 
     if sync or serve or from_cache:
         col = r.collect_repos(to_local=sync, to_memory=serve, from_cache=from_cache)
 
         if caddy:
-            if not from_cache:
-                print(
-                    "Error: --caddy requires --from-cache to be set, so that the repo data is available in the local cache for caddy to serve",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-            else:
-                r.configure_caddy(col["package_urls"], caddy_api_host, caddy_api_port)
+            r.configure_caddy(col["package_urls"], caddy_api_host, caddy_api_port)
         elif serve:
             r.run_webserver(col["package_urls"], col["memfiles"])
 
@@ -91,6 +88,12 @@ def main_parser() -> argparse.ArgumentParser:
         "-b",
         default=Releases2Repo.webserver_host,
         help="Local webserver hostname/ip to listen on",
+    )
+    parser.add_argument(
+        "--gen-pacman-config",
+        "-g",
+        action="store_true",
+        help="Generate a pacman configuration stub",
     )
     parser.add_argument(
         "--from-cache",
@@ -149,6 +152,7 @@ def main(cli_args: Sequence[str], prog: str | None = None) -> None:
         "repo": args.repo,
         "port": args.port,
         "host": args.bind,
+        "gen_pacman_config": args.gen_pacman_config,
         "from_cache": args.from_cache,
         "caddy_api_port": args.caddy_api_port,
         "caddy_api_host": args.caddy_api_host,

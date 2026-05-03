@@ -272,6 +272,13 @@ class Releases2Repo:
 
         return results
 
+    def print_pacman_config(self):
+        print(f"[{self.repo_name}]")
+        print("SigLevel = Optional TrustAll")
+        print(
+            f"Server = http://{self.webserver_host}:{self.webserver_port}/{self.repo_name}"
+        )
+
     def configure_caddy(self, package_urls, caddy_api_host, caddy_api_port):
         # almost all of this function was written by some stupid AI because I didn't feel like learning CADDY's config stuff
         # and so I have no idea what's going on in here, so if it breaks, good luck figuring out why
@@ -364,7 +371,9 @@ class Releases2Repo:
                 eargs = e.args[0]
                 if eargs.errno == 111:
                     print(f"ERROR: {eargs.strerror}", sys.stderr)
-                    print(f"Is caddy's api server running on {base.rstrip('/config')}? Hint:")
+                    print(
+                        f"Is caddy's api server running on {base.rstrip('/config')}? Hint:"
+                    )
                     print("systemctl start caddy-api")
                     sys.exit(1)
             except json.JSONDecodeError:
@@ -530,12 +539,7 @@ class Releases2Repo:
         try:
             with urllib.request.urlopen(req) as response:
                 if 200 <= response.status < 300:
-                    print("Put the following three lines into your /etc/pacman.conf:")
-                    print(f"[{self.repo_name}]")
-                    print("SigLevel = Optional TrustAll")
-                    print(
-                        f"Server = http://{self.webserver_host}:{self.webserver_port}/{self.repo_name}"
-                    )
+                    pass
                 else:
                     print(
                         f"Failed to configure Caddy: {response.status} {response.reason}"
