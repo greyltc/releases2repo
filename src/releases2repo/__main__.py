@@ -39,6 +39,7 @@ def run(
         sys.exit(0)
 
     if sync or serve or from_cache:
+        print(f"Using: {r.hub}/{r.owenr}/{r.repo}")
         col = r.collect_repos(to_local=sync, to_memory=serve, from_cache=from_cache)
 
         if caddy:
