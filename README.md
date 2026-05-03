@@ -11,12 +11,51 @@ Arch Linux.
 ## Installation
 
 ```console
-git clone https://aur.archlinux.org/python-releases2repo.git
-cd python-releases2repo
-makepkg -Cfis
+$ git clone https://aur.archlinux.org/python-releases2repo.git
+$ cd python-releases2repo
+$ makepkg -Cfis
 ```
 
 ## Usage
+```console
+$ r2repo --help
+usage: r2repo [-h] [--version] [--type {github,gitlab}] [--owner OWNER]
+              [--repo REPO] [--port PORT] [--bind BIND] [--from-cache]
+              [--caddy-api-port CADDY_API_PORT]
+              [--caddy-api-host CADDY_API_HOST] [--local LOCAL] [--sync]
+              [--serve] [--caddy]
+
+take package files from vcs releases and turn them into a repo that pacman can
+use
+
+options:
+  -h, --help            show this help message and exit
+  --version, -V         show program's version number and exit
+  --type, -t {github,gitlab}
+                        type of hub to fetch from (default: github)
+  --owner, -o OWNER     owner of vcs repo (default: greyltc)
+  --repo, -r REPO       vcs repo name (default: arch-packages)
+  --port, -p PORT       Local webserver port to listen on (default: 59523)
+  --bind, -b BIND       Local webserver hostname/ip to listen on (default:
+                        127.0.0.1)
+  --from-cache          Use cached data instead of fetching from the hub,
+                        requires --sync to have been run at least once before
+                        to populate the cache (default: False)
+  --caddy-api-port, -c CADDY_API_PORT
+                        Access caddy's api via this port (default: 2019)
+  --caddy-api-host, -H CADDY_API_HOST
+                        Access caddy's api via this hostname/ip (default:
+                        127.0.0.1)
+  --local, -l LOCAL     Local place to store pacman database files (default:
+                        /var/lib/r2repo)
+  --sync, -s            Update the local storage cache with the latest release
+                        data from the hub (default: False)
+  --serve               Run a webserver to serve the repo (default: False)
+  --caddy               Configure a caddy webserver (via its API) to serve the
+                        repo, requires --sync previously (default: False)
+```
+
+## Example
 
 ```console
 $ systemctl start caddy-api
@@ -40,12 +79,12 @@ $ run0 pacman -Syu
 ## Hacking
 
 ```console
-python -m venv --without-pip --system-site-packages --clear venv
-python -c 'import build; print(build.ProjectBuilder(".").build("editable", "venv"))'
-source venv/bin/activate
-python -m installer venv/*.whl
-# hack here
-deactivate
+$ python -m venv --without-pip --system-site-packages --clear venv
+$ python -c 'import build; print(build.ProjectBuilder(".").build("editable", "venv"))'
+$ source venv/bin/activate
+$ python -m installer venv/*.whl
+$ # hack here
+$ deactivate
 ```
 
 ## License
