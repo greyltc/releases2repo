@@ -13,8 +13,6 @@ import io
 import http.server
 import socketserver
 
-from pyparsing import col
-
 
 class Releases2Repo:
     hub = "github"
