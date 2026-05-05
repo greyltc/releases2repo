@@ -43,10 +43,18 @@ class Releases2Repo:
         self.webserver_host = host
         self.repo_name = f"{hub}_{owner}_{repo}"
         self.local_storage_path = storage
-        github_token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
-        if github_token:
-            self.extra_headers["Authorization"] = f"Bearer {github_token}"
-        # self.extra_headers["Authorization"] = "Bearer github_pat_abcde"  # hardcoded for testing
+        env_token = os.getenv("R2REPO_TOKEN") or os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
+        token_path = self.local_storage_path / f"{self.repo_name}_token.txt"
+        file_token = None
+        try:
+            if token_path.exists():
+                with open(token_path, "r") as f:
+                    file_token = f.read().strip()
+        except Exception as e:
+            pass
+        token = file_token or env_token
+        if token:
+            self.extra_headers["Authorization"] = f"Bearer {token}"
 
     def collect_repos(self, to_local=False, to_memory=False, from_cache=False) -> dict:
         results = {}
