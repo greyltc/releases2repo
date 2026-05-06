@@ -4,6 +4,8 @@
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/releases2repo.svg)](https://pypi.org/project/releases2repo)
 
 -----
+## AI
+I dictated to Microsoft's Copilot thing to generate a lot of the code in the `configure_caddy` function in `src/releases2repo/libreleases2repo.py` because I didn't feel like reading Caddy's api and configuration documentation. Looks like it did a pretty crap job, but it has fooled me into thinking it's working as I intend.
 
 ## Requirements
 Arch Linux.
